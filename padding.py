@@ -14,6 +14,13 @@ topk_ids = torch.tensor([
     12, 14, 15, 15                  # 4 elements for ep_rank 3 (IDs 12-15)
 ], dtype=torch.int32)
 
+topk_ids = torch.tensor([
+    0, 0, 1, 1, 1, 2, 3, 3, 3, 3, 3,      # 9 elements for ep_rank 0 (IDs 0-3)
+    4, 4, 5,                  # 5 elements for ep_rank 1 (IDs 4-7)
+    8, 8, 8, 9, 10, 10, 10, 11, 11,           # 6 elements for ep_rank 2 (IDs 8-11)
+    12                  # 4 elements for ep_rank 3 (IDs 12-15)
+], dtype=torch.int32)
+assert len(topk_ids) == num_tokens * top_k, len(topk_ids)
 topk_ids_pad, unpad_indices = process_topk_ids(
     topk_ids,
     expert_num,
