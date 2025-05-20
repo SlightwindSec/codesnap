@@ -1,10 +1,10 @@
 import torch
 
 # bs x seqlen
-num_tokens = 7
+num_tokens = 4096
 hidden_size = 32
 global_num_experts = 256
-top_k = 8
+top_k = 1
 
 hidden_states = torch.rand((num_tokens, hidden_size), dtype=torch.float32)
 router_weight = torch.rand((hidden_size, global_num_experts), dtype=torch.float32)
@@ -15,6 +15,7 @@ topk_weights, topk_ids = torch.topk(topk_weights.to(torch.float32), k=top_k, dim
 print(f"[+] topk_weights: {topk_weights.shape}")
 print(f"[+] topk_ids: {topk_ids.shape}")
 print(topk_ids)
+exit()
 row_idx_len = num_tokens * top_k
 
 row_idx = torch.arange(0, row_idx_len, dtype=torch.int32).view(top_k, -1).permute(1, 0).contiguous() % num_tokens
