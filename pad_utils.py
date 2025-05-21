@@ -59,6 +59,58 @@ def process_topk_ids(
 
     return topk_ids_pad, unpad_indices
 
+
+def process_topk_ids_optimized(
+    topk_ids: torch.Tensor,
+    expert_num: int,
+    ep_size: int,
+    max_row_per_ep_rank: int,
+    num_tokens: int,
+    top_k: int
+) -> tuple[torch.Tensor, torch.Tensor]:
+    original_total_elements = num_tokens * top_k
+    device = topk_ids.device
+    original_dtype = topk_ids.dtype
+
+    if original_total_elements == 0:
+        output_len = ep_size * max_row_per_ep_rank
+        topk_ids_pad = torch.full((output_len,), expert_num, dtype=original_dtype, device=device)
+        unpad_indices = torch.full((original_total_elements,), -1, dtype=torch.long, device=device)
+        return topk_ids_pad, unpad_indices
+
+    experts_per_ep_rank_val = expert_num // ep_size
+    if experts_per_ep_rank_val == 0:
+        raise ValueError("expert_num // ep_size is 0, which leads to division by zero in ep_rank calculation. "
+                         "Ensure expert_num >= ep_size.")
+    assigned_ep_rank = topk_ids // experts_per_ep_rank_val
+    indices_arange = torch.arange(len(topk_ids), device=device)
+    is_new_segment = torch.cat((
+        torch.tensor([True], device=device),
+        assigned_ep_rank[1:] != assigned_ep_rank[:-1]
+    ))
+    temp_start_markers = torch.full_like(indices_arange, -1, dtype=indices_arange.dtype)
+    temp_start_markers[is_new_segment] = indices_arange[is_new_segment]
+    start_offset_for_each_token = torch.cummax(temp_start_markers, dim=0)[0]
+    token_intra_ep_rank_idx = indices_arange - start_offset_for_each_token
+    is_kept_mask = token_intra_ep_rank_idx < max_row_per_ep_rank
+    cumsum_kept = torch.cumsum(is_kept_mask.to(torch.long), dim=0)
+    indices_in_rec_cond_list_for_all = cumsum_kept - 1 
+    unpad_indices = torch.where(
+        is_kept_mask,
+        indices_in_rec_cond_list_for_all,
+        torch.tensor(-1, device=device, dtype=torch.long)
+    )
+    output_len = ep_size * max_row_per_ep_rank
+    topk_ids_pad = torch.full((output_len,), expert_num, dtype=original_dtype, device=device)
+    if len(topk_ids) > 0:
+        all_destination_indices = assigned_ep_rank * max_row_per_ep_rank + token_intra_ep_rank_idx
+        temp_pad_buffer = torch.full((output_len + 1,), expert_num, dtype=original_dtype, device=device)
+        output_len_tensor = torch.tensor(output_len, dtype=torch.long, device=device)
+        scatter_indices = torch.where(is_kept_mask, all_destination_indices, output_len_tensor)
+        temp_pad_buffer.scatter_(0, scatter_indices, topk_ids)
+        topk_ids_pad = temp_pad_buffer[:output_len]
+    return topk_ids_pad, unpad_indices
+
 def recover_topk_ids(
     topk_ids_pad: torch.Tensor,
     unpad_indices: torch.Tensor,

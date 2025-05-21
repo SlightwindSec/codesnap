@@ -1,5 +1,6 @@
 import torch
-from pad_utils import process_topk_ids, recover_topk_ids, pad_topk_ids
+from pad_utils import recover_topk_ids, pad_topk_ids
+from pad_utils import process_topk_ids_optimized, process_topk_ids
 
 expert_num = 16
 ep_size = 4
@@ -50,4 +51,7 @@ for _ in range(100):
     topk_ids, _ = torch.sort(topk_ids)
     result = pad_topk_ids(topk_ids, expert_num, ep_size, max_row_per_ep_rank)
     topk_ids_pad, unpad_indices = process_topk_ids(topk_ids, expert_num, ep_size, max_row_per_ep_rank, num_tokens, top_k)
+    topk_ids_pad1, unpad_indices1 = process_topk_ids_optimized(topk_ids, expert_num, ep_size, max_row_per_ep_rank, num_tokens, top_k)
     assert result.tolist() == topk_ids_pad.tolist()
+    assert topk_ids_pad.tolist() == topk_ids_pad1.tolist()
+    assert unpad_indices.tolist() == unpad_indices1.tolist()
