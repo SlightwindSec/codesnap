@@ -6,7 +6,8 @@ from transformers import Gemma3TextConfig
 
 
 config = Gemma3TextConfig.from_pretrained("models/gemma-3-12b-it")
-# print(config)
+dtype = torch.bfloat16
+device = "npu"
 
 def _apply_rotary_emb_torch(
     x: torch.Tensor,
@@ -112,11 +113,11 @@ class RotaryEmbedding:
             key = torch.cat((key_rot, key_pass), dim=-1).reshape(key_shape)
         return query, key
 
-is_sliding = False
+is_sliding = True
 head_dim = config.head_dim
 max_position_embeddings = config.max_position_embeddings
-dtype = torch.get_default_dtype()
 
+print(f"{head_dim=}, {dtype=}")
 if is_sliding:
     # Local attention. Override the values in config.json.
     rope_theta = config.rope_local_base_freq

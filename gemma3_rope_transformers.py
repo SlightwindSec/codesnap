@@ -7,6 +7,9 @@ from transformers import Gemma3TextConfig
 
 from transformers.configuration_utils import PretrainedConfig
 
+device = "cpu"
+dtype = torch.bfloat16
+
 def _compute_default_rope_parameters(
     config: Optional[PretrainedConfig] = None,
     device: Optional["torch.device"] = None,
@@ -106,16 +109,18 @@ class Gemma3RotaryEmbedding(nn.Module):
 config = Gemma3TextConfig.from_pretrained("models/gemma-3-12b-it")
 
 # Full attention
-rotary_emb = Gemma3RotaryEmbedding(config=config)
+rotary_emb = Gemma3RotaryEmbedding(config=config, device=device)
 
 config_local = copy.deepcopy(config)
 config_local.rope_theta = config.rope_local_base_freq
 config_local.rope_scaling = {"rope_type": "default"}
 # Sliding attention
-rotary_emb_local = Gemma3RotaryEmbedding(config=config_local)
+rotary_emb_local = Gemma3RotaryEmbedding(config=config_local, device=device)
 
-hidden_states = torch.randn((1, 654, 3840))
+hidden_states = torch.randn((1, 654, 3840), dtype=dtype, device=device)
 position_ids = torch.arange(hidden_states.shape[1]).reshape(1, -1)
+dtype = hidden_states.dtype
+print(f"{dtype=}")
 # print(position_ids)
 position_embeddings_global = rotary_emb(hidden_states, position_ids)
 position_embeddings_local = rotary_emb_local(hidden_states, position_ids)
